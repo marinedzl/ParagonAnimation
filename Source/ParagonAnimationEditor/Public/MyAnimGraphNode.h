@@ -1,14 +1,13 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 #include "AnimGraphNode_Base.h"
 #include "MyAnimNode.h"
 #include "MyAnimGraphNode.generated.h"
 
 UCLASS()
-class PARAGONANIMATIONEDITOR_API UMyAnimGraphNode : public UAnimGraphNode_Base
+class UMyAnimGraphNode : public UAnimGraphNode_Base
 {
 	GENERATED_BODY()
+
 	UPROPERTY(EditAnywhere, Category = Settings)
 	FMyAnimNode Node;
 
