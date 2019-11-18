@@ -1,0 +1,28 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "ParagonAnimation",
+	"Description": "Paragon Animation",
+	"Category": "Other",
+	"CreatedBy": "Marine",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "ParagonAnimation",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault"
+		},
+		{
+			"Name": "ParagonAnimationEditor",
+			"Type": "Editor",
+			"LoadingPhase": "PreDefault"
+		}
+	]
+}
