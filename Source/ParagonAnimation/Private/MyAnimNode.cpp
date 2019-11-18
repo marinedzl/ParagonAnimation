@@ -9,7 +9,7 @@ FMyAnimNode::FMyAnimNode()
 }
 void FMyAnimNode::Initialize_AnyThread(const FAnimationInitializeContext & Context)
 {
-	FAnimNode_Base::Initialize(Context);
+	FAnimNode_Base::Initialize_AnyThread(Context);
 
 	BasePose.Initialize(Context);
 }
