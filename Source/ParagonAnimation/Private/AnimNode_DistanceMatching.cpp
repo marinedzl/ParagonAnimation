@@ -93,7 +93,7 @@ namespace
 FAnimNode_DistanceMatching::FAnimNode_DistanceMatching()
 	: Sequence(nullptr)
 	, Distance(0.0f)
-	, EnableMatching(false)
+	, EnableMatching(true)
 {
 }
 
