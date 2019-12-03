@@ -93,6 +93,7 @@ namespace
 FAnimNode_DistanceMatching::FAnimNode_DistanceMatching()
 	: Sequence(nullptr)
 	, Distance(0.0f)
+	, EnableMatching(false)
 {
 }
 
@@ -120,7 +121,7 @@ void FAnimNode_DistanceMatching::UpdateAssetPlayer(const FAnimationUpdateContext
 {
 	GetEvaluateGraphExposedInputs().Execute(Context);
 
-	if (Sequence)
+	if (Sequence && EnableMatching)
 	{
 		float Time = InternalTimeAccumulator;
 		float MoveDelta = Context.GetDeltaTime();
@@ -156,5 +157,13 @@ void FAnimNode_DistanceMatching::OverrideAsset(UAnimationAsset* NewAsset)
 	{
 		Sequence = NewSequence;
 	}
+}
+
+void FAnimNode_DistanceMatching::GatherDebugData(FNodeDebugData& DebugData)
+{
+	FString DebugLine = DebugData.GetNodeName(this);
+
+	DebugLine += FString::Printf(TEXT("('%s' Distance: %.3f, Time: %.3f)"), *GetNameSafe(Sequence), Distance, InternalTimeAccumulator);
+	DebugData.AddDebugItem(DebugLine, true);
 }
 #pragma optimize("", on)
