@@ -193,7 +193,6 @@ UParagonAnimInstance::UParagonAnimInstance(const FObjectInitializer& ObjectIniti
 	, IsMoving(false)
 	, IsAccelerating(false)
 	, IsFalling(false)
-	, IsLanding(false)
 	, DistanceMachingLocation(FVector::ZeroVector)
 	, MatchingDistance(0)
 	, RotationLastTick(FRotator::ZeroRotator)
@@ -241,48 +240,13 @@ void UParagonAnimInstance::UpdateDistanceMatching(float DeltaTimeX)
 	if (!ensure(CharacterMovement))
 		return;
 
-	bool IsFallingNow = CharacterMovement->IsFalling();
+	FVector CurrentAcceleration = CharacterMovement->GetCurrentAcceleration();
+	bool IsAcceleratingNow = FVector::DistSquared(CurrentAcceleration, FVector::ZeroVector) > 0;
 
-	if (IsFalling != IsFallingNow)
-	{
-		IsFalling = IsFallingNow;
-		if (!IsFalling)
-		{
-			IsAccelerating = true;
-		}
-	}
+	IsFalling = CharacterMovement->IsFalling();
 
-	if (IsFallingNow)
+	if (!IsFalling)
 	{
-		FVector CurrentAcceleration = CharacterMovement->GetCurrentAcceleration();
-		bool IsAcceleratingNow = CharacterMovement->Velocity.Z > 0;
-		if (IsAcceleratingNow != IsAccelerating)
-		{
-			IsAccelerating = IsAcceleratingNow;
-
-			if (IsAccelerating)
-			{
-				DistanceMachingLocation = Pawn->GetActorLocation();
-			}
-			else
-			{
-				PredictFallingLocation(
-					CharacterMovement,
-					DistanceMachingLocation,
-					Pawn->GetActorLocation(),
-					CharacterMovement->Velocity,
-					CurrentAcceleration,
-					CharacterMovement->FallingLateralFriction,
-					CharacterMovement->GetGravityZ(),
-					CharacterMovement->MaxSimulationTimeStep,
-					100);
-			}
-		}
-	}
-	else
-	{
-		FVector CurrentAcceleration = CharacterMovement->GetCurrentAcceleration();
-		bool IsAcceleratingNow = FVector::DistSquared(CurrentAcceleration, FVector::ZeroVector) > 0;
 		if (IsAcceleratingNow != IsAccelerating)
 		{
 			IsAccelerating = IsAcceleratingNow;
@@ -305,6 +269,10 @@ void UParagonAnimInstance::UpdateDistanceMatching(float DeltaTimeX)
 			}
 		}
 	}
+	else
+	{
+		IsAccelerating = IsAcceleratingNow;
+	}
 }
 
 void UParagonAnimInstance::EvalDistanceMatching(float DeltaTimeX)
@@ -317,18 +285,8 @@ void UParagonAnimInstance::EvalDistanceMatching(float DeltaTimeX)
 
 	FVector Location = Pawn->GetActorLocation();
 
-	if (IsFalling)
+	if (!IsFalling)
 	{
-		ACharacter* Character = Cast<ACharacter>(Pawn);
-		UCharacterMovementComponent* CharacterMovement = Character->GetCharacterMovement();
-		IsLanding = MatchingDistance < 80 && CharacterMovement->Velocity.Z > 0;
-		MatchingDistance = FVector::Dist(Location, DistanceMachingLocation);
-		if (IsLanding)
-			MatchingDistance = -MatchingDistance;
-	}
-	else
-	{
-		IsLanding = true;
 		MatchingDistance = FVector::Dist(Location, DistanceMachingLocation);
 		if (!IsAccelerating)
 			MatchingDistance = -MatchingDistance;

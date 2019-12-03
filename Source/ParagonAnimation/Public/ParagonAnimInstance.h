@@ -26,9 +26,6 @@ public:
 	bool IsFalling;
 
 	UPROPERTY(BlueprintReadOnly, Category = Animation)
-	bool IsLanding;
-
-	UPROPERTY(BlueprintReadOnly, Category = Animation)
 	FVector DistanceMachingLocation;
 
 	UPROPERTY(BlueprintReadOnly, Category = Animation)
