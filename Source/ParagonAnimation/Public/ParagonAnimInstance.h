@@ -4,6 +4,15 @@
 #include "Animation/AnimInstance.h"
 #include "ParagonAnimInstance.generated.h"
 
+UENUM(BlueprintType)
+enum class ECardinalDirection : uint8
+{
+	North UMETA(DisplayName = "North"),
+	East UMETA(DisplayName = "East"),
+	South UMETA(DisplayName = "South"),
+	West UMETA(DisplayName = "West"),
+};
+
 UCLASS()
 class PARAGONANIMATION_API UParagonAnimInstance : public UAnimInstance
 {
@@ -15,6 +24,12 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category = Animation)
 	float InverseYawDelta;
+
+	UPROPERTY(BlueprintReadOnly, Category = Animation)
+	float CardinalDirectionAngle;
+
+	UPROPERTY(BlueprintReadOnly, Category = Animation)
+	ECardinalDirection CardinalDirection;
 
 	UPROPERTY(BlueprintReadOnly, Category = Animation)
 	bool IsMoving;
@@ -36,6 +51,7 @@ public:
 	virtual void NativeUpdateAnimation(float DeltaTimeX) override;
 private:
 	void UpdateActorLean(float DeltaTimeX);
+	void UpdateCardinalDirection(float DeltaTimeX);
 private:
 	void UpdateDistanceMatching(float DeltaTimeX);
 	void EvalDistanceMatching(float DeltaTimeX);

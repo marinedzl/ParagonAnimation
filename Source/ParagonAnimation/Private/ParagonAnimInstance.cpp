@@ -190,6 +190,7 @@ UParagonAnimInstance::UParagonAnimInstance(const FObjectInitializer& ObjectIniti
 	: Super(ObjectInitializer)
 	, YawDelta(0)
 	, InverseYawDelta(0)
+	, CardinalDirection(ECardinalDirection::North)
 	, IsMoving(false)
 	, IsAccelerating(false)
 	, IsFalling(false)
@@ -222,6 +223,7 @@ void UParagonAnimInstance::NativeUpdateAnimation(float DeltaTimeX)
 	Super::NativeUpdateAnimation(DeltaTimeX);
 
 	UpdateActorLean(DeltaTimeX);
+	UpdateCardinalDirection(DeltaTimeX);
 	UpdateDistanceMatching(DeltaTimeX);
 	EvalDistanceMatching(DeltaTimeX);
 }
@@ -305,5 +307,50 @@ void UParagonAnimInstance::UpdateActorLean(float DeltaTimeX)
 	InverseYawDelta = -YawDelta;
 
 	RotationLastTick = ActorRotation;
+}
+
+void UParagonAnimInstance::UpdateCardinalDirection(float DeltaTimeX)
+{
+	APawn* Pawn = TryGetPawnOwner();
+	if (!Pawn)
+		return;
+
+	ACharacter* Character = Cast<ACharacter>(Pawn);
+	if (!ensure(Character))
+		return;
+
+	UCharacterMovementComponent* CharacterMovement = Character->GetCharacterMovement();
+	if (!ensure(CharacterMovement))
+		return;
+
+	FVector CurrentAcceleration = CharacterMovement->GetCurrentAcceleration();
+	bool IsAcceleratingNow = FVector::DistSquared(CurrentAcceleration, FVector::ZeroVector) > 0;
+
+	if (!IsAcceleratingNow)
+		return;
+
+	FRotator InputRotation = CurrentAcceleration.ToOrientationRotator();
+	FRotator ActorRotation = Pawn->GetActorRotation();
+
+	float Delta = FMath::FindDeltaAngleDegrees(InputRotation.Yaw, ActorRotation.Yaw);
+	CardinalDirectionAngle = Delta;
+	if (Delta > 0.f)
+	{
+		if (Delta < 50.f)
+			CardinalDirection = ECardinalDirection::North;
+		else if (Delta > 130.f)
+			CardinalDirection = ECardinalDirection::South;
+		else
+			CardinalDirection = ECardinalDirection::West;
+	}
+	else
+	{
+		if (Delta > -50.f)
+			CardinalDirection = ECardinalDirection::North;
+		else if (Delta < -130.f)
+			CardinalDirection = ECardinalDirection::South;
+		else
+			CardinalDirection = ECardinalDirection::East;
+	}
 }
 #pragma optimize( "", on )
