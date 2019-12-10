@@ -333,24 +333,41 @@ void UParagonAnimInstance::UpdateCardinalDirection(float DeltaTimeX)
 	FRotator ActorRotation = Pawn->GetActorRotation();
 
 	float Delta = FMath::FindDeltaAngleDegrees(InputRotation.Yaw, ActorRotation.Yaw);
-	CardinalDirectionAngle = Delta;
 	if (Delta > 0.f)
 	{
 		if (Delta < 50.f)
+		{
 			CardinalDirection = ECardinalDirection::North;
+			CardinalDirectionAngle = -Delta;
+		}
 		else if (Delta > 130.f)
+		{
 			CardinalDirection = ECardinalDirection::South;
+			CardinalDirectionAngle = 180 - Delta;
+		}
 		else
+		{
 			CardinalDirection = ECardinalDirection::West;
+			CardinalDirectionAngle = 0;
+		}
 	}
 	else
 	{
 		if (Delta > -50.f)
+		{
 			CardinalDirection = ECardinalDirection::North;
+			CardinalDirectionAngle = -Delta;
+		}
 		else if (Delta < -130.f)
+		{
 			CardinalDirection = ECardinalDirection::South;
+			CardinalDirectionAngle = -180 - Delta;
+		}
 		else
+		{
 			CardinalDirection = ECardinalDirection::East;
+			CardinalDirectionAngle = 0;
+		}
 	}
 }
 #pragma optimize( "", on )
