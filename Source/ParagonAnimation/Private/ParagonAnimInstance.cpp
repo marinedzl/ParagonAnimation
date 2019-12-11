@@ -335,12 +335,12 @@ void UParagonAnimInstance::UpdateCardinalDirection(float DeltaTimeX)
 	float Delta = FMath::FindDeltaAngleDegrees(InputRotation.Yaw, ActorRotation.Yaw);
 	if (Delta > 0.f)
 	{
-		if (Delta < 50.f)
+		if (Delta < 70.f)
 		{
 			CardinalDirection = ECardinalDirection::North;
 			CardinalDirectionAngle = Delta;
 		}
-		else if (Delta > 130.f)
+		else if (Delta > 110.f)
 		{
 			CardinalDirection = ECardinalDirection::South;
 			CardinalDirectionAngle = Delta + 180;
@@ -353,12 +353,12 @@ void UParagonAnimInstance::UpdateCardinalDirection(float DeltaTimeX)
 	}
 	else
 	{
-		if (Delta > -50.f)
+		if (Delta > -70.f)
 		{
 			CardinalDirection = ECardinalDirection::North;
 			CardinalDirectionAngle = Delta;
 		}
-		else if (Delta < -130.f)
+		else if (Delta < -110.f)
 		{
 			CardinalDirection = ECardinalDirection::South;
 			CardinalDirectionAngle = Delta + 180;
