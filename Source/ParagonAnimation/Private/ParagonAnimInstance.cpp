@@ -338,17 +338,17 @@ void UParagonAnimInstance::UpdateCardinalDirection(float DeltaTimeX)
 		if (Delta < 50.f)
 		{
 			CardinalDirection = ECardinalDirection::North;
-			CardinalDirectionAngle = -Delta;
+			CardinalDirectionAngle = Delta;
 		}
 		else if (Delta > 130.f)
 		{
 			CardinalDirection = ECardinalDirection::South;
-			CardinalDirectionAngle = 180 - Delta;
+			CardinalDirectionAngle = Delta + 180;
 		}
 		else
 		{
 			CardinalDirection = ECardinalDirection::West;
-			CardinalDirectionAngle = 0;
+			CardinalDirectionAngle = Delta - 90;
 		}
 	}
 	else
@@ -356,18 +356,20 @@ void UParagonAnimInstance::UpdateCardinalDirection(float DeltaTimeX)
 		if (Delta > -50.f)
 		{
 			CardinalDirection = ECardinalDirection::North;
-			CardinalDirectionAngle = -Delta;
+			CardinalDirectionAngle = Delta;
 		}
 		else if (Delta < -130.f)
 		{
 			CardinalDirection = ECardinalDirection::South;
-			CardinalDirectionAngle = -180 - Delta;
+			CardinalDirectionAngle = Delta + 180;
 		}
 		else
 		{
 			CardinalDirection = ECardinalDirection::East;
-			CardinalDirectionAngle = 0;
+			CardinalDirectionAngle = Delta + 90;
 		}
 	}
+
+	CardinalDirectionAngle = -CardinalDirectionAngle;
 }
 #pragma optimize( "", on )
