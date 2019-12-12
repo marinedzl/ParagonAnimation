@@ -188,6 +188,8 @@ namespace
 
 UParagonAnimInstance::UParagonAnimInstance(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
+	, AimYaw(0)
+	, AimPitch(0)
 	, YawDelta(0)
 	, InverseYawDelta(0)
 	, CardinalDirection(ECardinalDirection::North)
@@ -225,6 +227,7 @@ void UParagonAnimInstance::NativeUpdateAnimation(float DeltaTimeX)
 
 	UpdateActorLean(DeltaTimeX);
 	UpdateCardinalDirection(DeltaTimeX);
+	UpdateAim(DeltaTimeX);
 	UpdateDistanceMatching(DeltaTimeX);
 	EvalDistanceMatching(DeltaTimeX);
 }
@@ -294,6 +297,28 @@ void UParagonAnimInstance::EvalDistanceMatching(float DeltaTimeX)
 		if (!IsAccelerating)
 			MatchingDistance = -MatchingDistance;
 	}
+}
+
+void UParagonAnimInstance::UpdateAim(float DeltaTimeX)
+{
+	APawn* Pawn = TryGetPawnOwner();
+	if (!Pawn)
+		return;
+
+	ACharacter* Character = Cast<ACharacter>(Pawn);
+	if (!ensure(Character))
+		return;
+
+	USkeletalMeshComponent* Mesh = Character->GetMesh();
+	if (!ensure(Mesh))
+		return;
+
+	FRotator BaseAimRotation = Pawn->GetBaseAimRotation(); // Camera Rotation
+	FRotator MeshRotation = Mesh->GetComponentRotation() - Character->GetBaseRotationOffsetRotator();
+	FRotator Delta = BaseAimRotation - MeshRotation;
+	Delta.Normalize();
+	AimYaw = Delta.Yaw;
+	AimPitch = Delta.Pitch;
 }
 
 void UParagonAnimInstance::UpdateActorLean(float DeltaTimeX)

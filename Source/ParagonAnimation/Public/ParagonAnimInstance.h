@@ -20,6 +20,12 @@ class PARAGONANIMATION_API UParagonAnimInstance : public UAnimInstance
 
 public:
 	UPROPERTY(BlueprintReadOnly, Category = Animation)
+	float AimYaw;
+
+	UPROPERTY(BlueprintReadOnly, Category = Animation)
+	float AimPitch;
+
+	UPROPERTY(BlueprintReadOnly, Category = Animation)
 	float YawDelta;
 
 	UPROPERTY(BlueprintReadOnly, Category = Animation)
@@ -50,6 +56,7 @@ public:
 	virtual void NativeBeginPlay() override;
 	virtual void NativeUpdateAnimation(float DeltaTimeX) override;
 private:
+	void UpdateAim(float DeltaTimeX);
 	void UpdateActorLean(float DeltaTimeX);
 	void UpdateCardinalDirection(float DeltaTimeX);
 private:
