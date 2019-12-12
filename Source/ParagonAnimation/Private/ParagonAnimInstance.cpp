@@ -197,6 +197,7 @@ UParagonAnimInstance::UParagonAnimInstance(const FObjectInitializer& ObjectIniti
 	, DistanceMachingLocation(FVector::ZeroVector)
 	, MatchingDistance(0)
 	, RotationLastTick(FRotator::ZeroRotator)
+	, AccelerationLastTick(FVector::ZeroVector)
 {
 }
 
@@ -328,6 +329,9 @@ void UParagonAnimInstance::UpdateCardinalDirection(float DeltaTimeX)
 
 	if (!IsAcceleratingNow)
 		return;
+
+	CurrentAcceleration = FMath::VInterpTo(AccelerationLastTick, CurrentAcceleration, DeltaTimeX, 10);
+	AccelerationLastTick = CurrentAcceleration;
 
 	FRotator InputRotation = CurrentAcceleration.ToOrientationRotator();
 	FRotator ActorRotation = Pawn->GetActorRotation();

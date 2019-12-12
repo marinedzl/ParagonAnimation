@@ -57,4 +57,5 @@ private:
 	void EvalDistanceMatching(float DeltaTimeX);
 private:
 	FRotator RotationLastTick;
+	FVector AccelerationLastTick;
 };
