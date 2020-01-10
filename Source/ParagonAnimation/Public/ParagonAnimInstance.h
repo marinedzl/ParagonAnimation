@@ -4,6 +4,8 @@
 #include "Animation/AnimInstance.h"
 #include "ParagonAnimInstance.generated.h"
 
+class UPawnMovementComponent;
+
 UENUM(BlueprintType)
 enum class ECardinalDirection : uint8
 {
@@ -63,6 +65,9 @@ private:
 	void UpdateDistanceMatching(float DeltaTimeX);
 	void EvalDistanceMatching(float DeltaTimeX);
 private:
+	UMeshComponent* MeshComponent;
+	UPawnMovementComponent* MoveComponent;
+	FRotator BaseRotationOffsetRotator;
 	FRotator RotationLastTick;
 	FVector AccelerationLastTick;
 };
