@@ -1,8 +1,8 @@
 #include "ParagonAnimInstance.h"
-#include "GameFramework/PawnMovementComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 #pragma optimize( "", off )
-/*
 namespace
 {
 	inline FVector CalcVelocity(const FVector& Velocity, const FVector& Acceleration, float Friction, float TimeStep)
@@ -27,7 +27,7 @@ namespace
 		float Friction,
 		float BrakingDeceleration,
 		const float TimeStep,
-		const int MaxSimulationIterations)
+		const int MaxSimulationIterations /*= 10*/)
 	{
 		const float MIN_TICK_TIME = 1e-6;
 		if (TimeStep < MIN_TICK_TIME)
@@ -135,7 +135,7 @@ namespace
 		float FallingLateralFriction,
 		float Gravity,
 		const float TimeStep,
-		const int MaxSimulationIterations)
+		const int MaxSimulationIterations /*= 10*/)
 	{
 		const float MIN_TICK_TIME = 1e-6;
 		if (TimeStep < MIN_TICK_TIME)
@@ -185,7 +185,6 @@ namespace
 		return false;
 	}
 }
-*/
 
 UParagonAnimInstance::UParagonAnimInstance(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -219,14 +218,6 @@ void UParagonAnimInstance::NativeBeginPlay()
 	FRotator ActorRotation = Pawn->GetActorRotation();
 	RotationLastTick = ActorRotation;
 	YawDelta = 0;
-
-	MoveComponent = Pawn->GetMovementComponent();
-
-	MeshComponent = Pawn->FindComponentByClass<UMeshComponent>();
-	if (MeshComponent)
-	{
-		BaseRotationOffsetRotator = MeshComponent->RelativeRotation;
-	}
 }
 
 void UParagonAnimInstance::NativeUpdateAnimation(float DeltaTimeX)
@@ -244,35 +235,49 @@ void UParagonAnimInstance::NativeUpdateAnimation(float DeltaTimeX)
 void UParagonAnimInstance::UpdateDistanceMatching(float DeltaTimeX)
 {
 	APawn* Pawn = TryGetPawnOwner();
-	if (!Pawn || !MoveComponent)
+	if (!Pawn)
 		return;
 
-	FVector CurrentAcceleration = MoveComponent->GetLastInputVector().GetClampedToMaxSize(1.f);
+	ACharacter* Character = Cast<ACharacter>(Pawn);
+	if (!ensure(Character))
+		return;
+
+	UCharacterMovementComponent* CharacterMovement = Character->GetCharacterMovement();
+	if (!ensure(CharacterMovement))
+		return;
+
+	FVector CurrentAcceleration = CharacterMovement->GetCurrentAcceleration();
 	bool IsAcceleratingNow = FVector::DistSquared(CurrentAcceleration, FVector::ZeroVector) > 0;
 
-	if (IsAcceleratingNow != IsAccelerating)
+	IsFalling = CharacterMovement->IsFalling();
+
+	if (!IsFalling)
+	{
+		if (IsAcceleratingNow != IsAccelerating)
+		{
+			IsAccelerating = IsAcceleratingNow;
+
+			if (IsAccelerating)
+			{
+				DistanceMachingLocation = Pawn->GetActorLocation();
+			}
+			else
+			{
+				PredictStopLocation(
+					DistanceMachingLocation,
+					Pawn->GetActorLocation(),
+					CharacterMovement->Velocity,
+					CurrentAcceleration,
+					CharacterMovement->BrakingFriction,
+					CharacterMovement->GetMaxBrakingDeceleration(),
+					CharacterMovement->MaxSimulationTimeStep,
+					100);
+			}
+		}
+	}
+	else
 	{
 		IsAccelerating = IsAcceleratingNow;
-
-		if (IsAccelerating)
-		{
-			DistanceMachingLocation = Pawn->GetActorLocation();
-		}
-		else
-		{
-			DistanceMachingLocation = Pawn->GetActorLocation() + CurrentAcceleration * 300;
-			/*
-			PredictStopLocation(
-				DistanceMachingLocation,
-				Pawn->GetActorLocation(),
-				CharacterMovement->Velocity,
-				CurrentAcceleration,
-				CharacterMovement->BrakingFriction,
-				CharacterMovement->GetMaxBrakingDeceleration(),
-				CharacterMovement->MaxSimulationTimeStep,
-				100);
-				*/
-		}
 	}
 }
 
@@ -297,11 +302,19 @@ void UParagonAnimInstance::EvalDistanceMatching(float DeltaTimeX)
 void UParagonAnimInstance::UpdateAim(float DeltaTimeX)
 {
 	APawn* Pawn = TryGetPawnOwner();
-	if (!Pawn || !MeshComponent)
+	if (!Pawn)
+		return;
+
+	ACharacter* Character = Cast<ACharacter>(Pawn);
+	if (!ensure(Character))
+		return;
+
+	USkeletalMeshComponent* Mesh = Character->GetMesh();
+	if (!ensure(Mesh))
 		return;
 
 	FRotator BaseAimRotation = Pawn->GetBaseAimRotation(); // Camera Rotation
-	FRotator MeshRotation = MeshComponent->GetComponentRotation() - BaseRotationOffsetRotator;
+	FRotator MeshRotation = Mesh->GetComponentRotation() - Character->GetBaseRotationOffsetRotator();
 	FRotator Delta = BaseAimRotation - MeshRotation;
 	Delta.Normalize();
 	AimYaw = Delta.Yaw;
@@ -325,10 +338,18 @@ void UParagonAnimInstance::UpdateActorLean(float DeltaTimeX)
 void UParagonAnimInstance::UpdateCardinalDirection(float DeltaTimeX)
 {
 	APawn* Pawn = TryGetPawnOwner();
-	if (!Pawn || !MoveComponent)
+	if (!Pawn)
 		return;
 
-	FVector CurrentAcceleration = MoveComponent->GetLastInputVector().GetClampedToMaxSize(1.f);
+	ACharacter* Character = Cast<ACharacter>(Pawn);
+	if (!ensure(Character))
+		return;
+
+	UCharacterMovementComponent* CharacterMovement = Character->GetCharacterMovement();
+	if (!ensure(CharacterMovement))
+		return;
+
+	FVector CurrentAcceleration = CharacterMovement->GetCurrentAcceleration();
 	bool IsAcceleratingNow = FVector::DistSquared(CurrentAcceleration, FVector::ZeroVector) > 0;
 
 	if (!IsAcceleratingNow)
