@@ -17,8 +17,14 @@ void UAnimGraphNode_DistanceMatching::PreloadRequiredAssets()
 void UAnimGraphNode_DistanceMatching::BakeDataDuringCompilation(class FCompilerResultsLog& MessageLog)
 {
 	UAnimBlueprint* AnimBlueprint = GetAnimBlueprint();
-	Node.GroupIndex = AnimBlueprint->FindOrAddGroup(SyncGroup.GroupName);
+	AnimBlueprint->FindOrAddGroup(SyncGroup.GroupName);
+	Node.GroupName = SyncGroup.GroupName;
 	Node.GroupRole = SyncGroup.GroupRole;
+	Node.GroupScope = SyncGroup.GroupScope;
+}
+
+void UAnimGraphNode_DistanceMatching::OnProcessDuringCompilation(IAnimBlueprintCompilationContext& InCompilationContext, IAnimBlueprintGeneratedClassCompiledData& OutCompiledData)
+{
 }
 
 void UAnimGraphNode_DistanceMatching::GetAllAnimationSequencesReferred(TArray<UAnimationAsset*>& AnimationAssets) const
@@ -72,6 +78,11 @@ FText UAnimGraphNode_DistanceMatching::GetNodeTitle(ENodeTitleType::Type TitleTy
 	}
 
 	return CachedNodeTitle;
+}
+
+FString UAnimGraphNode_DistanceMatching::GetNodeCategory() const
+{
+	return TEXT("Distance Matching");
 }
 
 void UAnimGraphNode_DistanceMatching::SetAnimationAsset(UAnimationAsset* Asset)

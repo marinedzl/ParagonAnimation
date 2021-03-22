@@ -26,6 +26,8 @@ public:
 	virtual void ValidateAnimNodeDuringCompilation(class USkeleton* ForSkeleton, class FCompilerResultsLog& MessageLog) override;
 	virtual void PreloadRequiredAssets() override;
 	virtual void BakeDataDuringCompilation(class FCompilerResultsLog& MessageLog) override;
+	virtual FString GetNodeCategory() const override;
+	virtual void OnProcessDuringCompilation(IAnimBlueprintCompilationContext& InCompilationContext, IAnimBlueprintGeneratedClassCompiledData& OutCompiledData) override;
 	// Interface to support transition getter
 	virtual bool DoesSupportTimeForTransitionGetter() const override;
 	virtual UAnimationAsset* GetAnimationAsset() const override;
