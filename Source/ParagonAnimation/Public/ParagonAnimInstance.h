@@ -5,7 +5,7 @@
 #include "ParagonAnimInstance.generated.h"
 
 UENUM(BlueprintType)
-enum class ECardinalDirection : uint8
+enum class EAnimCardinalDirection : uint8
 {
 	North UMETA(DisplayName = "North"),
 	East UMETA(DisplayName = "East"),
@@ -20,49 +20,51 @@ class PARAGONANIMATION_API UParagonAnimInstance : public UAnimInstance
 
 public:
 	UPROPERTY(BlueprintReadOnly, Category = Animation)
+	bool IsAccelerating;
+
+	UPROPERTY(BlueprintReadOnly, Category = Animation)
+	bool IsMoving;
+
+	UPROPERTY(BlueprintReadOnly, Category = Animation)
+	float Lean;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Animation)
+	float LeanFactor;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Animation)
+	float LeanInterpSpeed;
+
+	UPROPERTY(BlueprintReadOnly, Category = Animation)
+	EAnimCardinalDirection CardinalDirection;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Animation)
+	float MeshRotationInterpSpeed;
+
+	UPROPERTY(BlueprintReadOnly, Category = Animation)
 	float AimYaw;
 
 	UPROPERTY(BlueprintReadOnly, Category = Animation)
 	float AimPitch;
 
 	UPROPERTY(BlueprintReadOnly, Category = Animation)
-	float YawDelta;
+	float DistanceMachingStart;
 
 	UPROPERTY(BlueprintReadOnly, Category = Animation)
-	float InverseYawDelta;
+	float DistanceMachingStop;
 
-	UPROPERTY(BlueprintReadOnly, Category = Animation)
-	float CardinalDirectionAngle;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Animation)
+	float DistanceMachingScaling;
 
-	UPROPERTY(BlueprintReadOnly, Category = Animation)
-	ECardinalDirection CardinalDirection;
-
-	UPROPERTY(BlueprintReadOnly, Category = Animation)
-	bool IsMoving;
-
-	UPROPERTY(BlueprintReadOnly, Category = Animation)
-	bool IsAccelerating;
-
-	UPROPERTY(BlueprintReadOnly, Category = Animation)
-	bool IsFalling;
-
-	UPROPERTY(BlueprintReadOnly, Category = Animation)
-	FVector DistanceMachingLocation;
-
-	UPROPERTY(BlueprintReadOnly, Category = Animation)
-	float MatchingDistance;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Animation)
+	bool bDrawDebug;
+	
 public:
-	virtual void NativeInitializeAnimation() override;
 	virtual void NativeBeginPlay() override;
-	virtual void NativeUpdateAnimation(float DeltaTimeX) override;
+	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
+
 private:
-	void UpdateAim(float DeltaTimeX);
-	void UpdateActorLean(float DeltaTimeX);
-	void UpdateCardinalDirection(float DeltaTimeX);
-private:
-	void UpdateDistanceMatching(float DeltaTimeX);
-	void EvalDistanceMatching(float DeltaTimeX);
-private:
-	FRotator RotationLastTick;
-	FVector AccelerationLastTick;
+	FRotator ActorRotation;
+	FRotator MeshRotation;
+	FVector DistanceMachingStartLocation;
+	FVector DistanceMachingStopLocation;
 };

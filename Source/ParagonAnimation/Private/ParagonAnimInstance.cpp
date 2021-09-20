@@ -1,23 +1,11 @@
 #include "ParagonAnimInstance.h"
+#include "DrawDebugHelpers.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 #pragma optimize( "", off )
 namespace
 {
-	inline FVector CalcVelocity(const FVector& Velocity, const FVector& Acceleration, float Friction, float TimeStep)
-	{
-		FVector TotalAcceleration = Acceleration;
-		TotalAcceleration.Z = 0;
-
-		// Friction affects our ability to change direction. This is only done for input acceleration, not path following.
-		const FVector AccelDir = TotalAcceleration.GetSafeNormal();
-		const float VelSize = Velocity.Size();
-		TotalAcceleration += -(Velocity - AccelDir * VelSize) * Friction;
-		// Apply acceleration
-		return Velocity + TotalAcceleration * TimeStep;
-	}
-
 	// Copy from CharacterMovementComponent
 	bool PredictStopLocation(
 		FVector& OutStopLocation,
@@ -125,280 +113,166 @@ namespace
 
 		return false;
 	}
-
-	bool PredictFallingLocation(
-		UCharacterMovementComponent* CharacterMovementComponent,
-		FVector& OutStopLocation,
-		const FVector& _CurrentLocation,
-		const FVector& _Velocity,
-		const FVector& Acceleration,
-		float FallingLateralFriction,
-		float Gravity,
-		const float TimeStep,
-		const int MaxSimulationIterations /*= 10*/)
-	{
-		const float MIN_TICK_TIME = 1e-6;
-		if (TimeStep < MIN_TICK_TIME)
-		{
-			return false;
-		}
-
-		FVector Velocity = _Velocity;
-		FVector LastLocation = _CurrentLocation;
-
-		int Iterations = 0;
-		while (Iterations < MaxSimulationIterations)
-		{
-			Iterations++;
-
-			FVector OldVelocity = Velocity;
-
-			// Apply input
-			{
-				Velocity.Z = 0.f;
-				Velocity = CalcVelocity(Velocity, Acceleration, FallingLateralFriction, TimeStep);
-				Velocity.Z = OldVelocity.Z;
-			}
-
-			// Apply gravity
-			{
-				float GravityTime = TimeStep;
-				Velocity += FVector(0.f, 0.f, Gravity) * GravityTime;
-			}
-
-			LastLocation += Velocity * TimeStep;
-
-			const FVector PawnLocation = LastLocation;
-			FFindFloorResult FloorResult;
-			CharacterMovementComponent->FindFloor(PawnLocation, FloorResult, false);
-			if (FloorResult.IsWalkableFloor())
-			{
-				FVector TestLocation = FloorResult.HitResult.ImpactPoint;
-				FNavLocation NavLocation;
-				CharacterMovementComponent->FindNavFloor(TestLocation, NavLocation);
-				OutStopLocation = NavLocation;
-				OutStopLocation += FVector(0, 0, CharacterMovementComponent->UpdatedComponent->Bounds.BoxExtent.Z);
-				return true;
-			}
-		}
-
-		return false;
-	}
 }
 
 UParagonAnimInstance::UParagonAnimInstance(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
-	, AimYaw(0)
-	, AimPitch(0)
-	, YawDelta(0)
-	, InverseYawDelta(0)
-	, CardinalDirection(ECardinalDirection::North)
-	, IsMoving(false)
-	, IsAccelerating(false)
-	, IsFalling(false)
-	, DistanceMachingLocation(FVector::ZeroVector)
-	, MatchingDistance(0)
-	, RotationLastTick(FRotator::ZeroRotator)
-	, AccelerationLastTick(FVector::ZeroVector)
 {
-}
+	IsAccelerating = false;
+	IsMoving = false;
+	Lean = 0.f;
+	LeanFactor = 0.3f;
+	LeanInterpSpeed = 10.f;
+	CardinalDirection = EAnimCardinalDirection::North;
+	MeshRotationInterpSpeed = 10.f;
+	AimYaw = 0.f;
+	AimPitch = 0.f;
+	DistanceMachingStart = 0.f;
+	DistanceMachingStop = 0.f;
+	DistanceMachingScaling = 1.f;
 
-void UParagonAnimInstance::NativeInitializeAnimation()
-{
-	//Very Important Line
-	Super::NativeInitializeAnimation();
+	ActorRotation = FRotator::ZeroRotator;
+	MeshRotation = FRotator::ZeroRotator;
+	DistanceMachingStartLocation = FVector::ZeroVector;
+	DistanceMachingStopLocation = FVector::ZeroVector;
+
+	bDrawDebug = false;
 }
 
 void UParagonAnimInstance::NativeBeginPlay()
 {
-	APawn* Pawn = TryGetPawnOwner();
-	if (!Pawn)
-		return;
+	Super::NativeBeginPlay();
 
-	FRotator ActorRotation = Pawn->GetActorRotation();
-	RotationLastTick = ActorRotation;
-	YawDelta = 0;
+	ACharacter* Character = Cast<ACharacter>(TryGetPawnOwner());
+	if (Character)
+	{
+		ActorRotation = Character->GetActorRotation();
+		MeshRotation = Character->GetBaseRotationOffsetRotator() + ActorRotation;
+	}
 }
 
-void UParagonAnimInstance::NativeUpdateAnimation(float DeltaTimeX)
+void UParagonAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
-	//Very Important Line
-	Super::NativeUpdateAnimation(DeltaTimeX);
+	Super::NativeUpdateAnimation(DeltaSeconds);
 
-	UpdateActorLean(DeltaTimeX);
-	UpdateCardinalDirection(DeltaTimeX);
-	UpdateAim(DeltaTimeX);
-	UpdateDistanceMatching(DeltaTimeX);
-	EvalDistanceMatching(DeltaTimeX);
-}
-
-void UParagonAnimInstance::UpdateDistanceMatching(float DeltaTimeX)
-{
-	APawn* Pawn = TryGetPawnOwner();
-	if (!Pawn)
-		return;
-
-	ACharacter* Character = Cast<ACharacter>(Pawn);
-	if (!ensure(Character))
+	ACharacter* Character = Cast<ACharacter>(TryGetPawnOwner());
+	if (!Character)
 		return;
 
 	UCharacterMovementComponent* CharacterMovement = Character->GetCharacterMovement();
 	if (!ensure(CharacterMovement))
-		return;
-
-	FVector CurrentAcceleration = CharacterMovement->GetCurrentAcceleration();
-	bool IsAcceleratingNow = FVector::DistSquared(CurrentAcceleration, FVector::ZeroVector) > 0;
-
-	IsFalling = CharacterMovement->IsFalling();
-
-	if (!IsFalling)
-	{
-		if (IsAcceleratingNow != IsAccelerating)
-		{
-			IsAccelerating = IsAcceleratingNow;
-
-			if (IsAccelerating)
-			{
-				DistanceMachingLocation = Pawn->GetActorLocation();
-			}
-			else
-			{
-				PredictStopLocation(
-					DistanceMachingLocation,
-					Pawn->GetActorLocation(),
-					CharacterMovement->Velocity,
-					CurrentAcceleration,
-					CharacterMovement->BrakingFriction,
-					CharacterMovement->GetMaxBrakingDeceleration(),
-					CharacterMovement->MaxSimulationTimeStep,
-					100);
-			}
-		}
-	}
-	else
-	{
-		IsAccelerating = IsAcceleratingNow;
-	}
-}
-
-void UParagonAnimInstance::EvalDistanceMatching(float DeltaTimeX)
-{
-	APawn* Pawn = TryGetPawnOwner();
-	if (!Pawn)
-		return;
-	
-	IsMoving = FVector::Dist(Pawn->GetVelocity(), FVector::ZeroVector) > 0;
-
-	FVector Location = Pawn->GetActorLocation();
-
-	if (!IsFalling)
-	{
-		MatchingDistance = FVector::Dist(Location, DistanceMachingLocation);
-		if (!IsAccelerating)
-			MatchingDistance = -MatchingDistance;
-	}
-}
-
-void UParagonAnimInstance::UpdateAim(float DeltaTimeX)
-{
-	APawn* Pawn = TryGetPawnOwner();
-	if (!Pawn)
-		return;
-
-	ACharacter* Character = Cast<ACharacter>(Pawn);
-	if (!ensure(Character))
 		return;
 
 	USkeletalMeshComponent* Mesh = Character->GetMesh();
 	if (!ensure(Mesh))
 		return;
 
-	FRotator BaseAimRotation = Pawn->GetBaseAimRotation(); // Camera Rotation
-	FRotator MeshRotation = Mesh->GetComponentRotation() - Character->GetBaseRotationOffsetRotator();
-	FRotator Delta = BaseAimRotation - MeshRotation;
-	Delta.Normalize();
-	AimYaw = Delta.Yaw;
-	AimPitch = Delta.Pitch;
-}
+	const FVector CurrentActorLoaction = Character->GetActorLocation();
+	const FVector CurrentAcceleration = CharacterMovement->GetCurrentAcceleration();
+	const FVector CurrentVelocity = CharacterMovement->Velocity;
+	const FRotator NewActorRotation = Character->GetActorRotation();
+	const FRotator BaseMeshRotationOffset = Character->GetBaseRotationOffsetRotator();
 
-void UParagonAnimInstance::UpdateActorLean(float DeltaTimeX)
-{
-	APawn* Pawn = TryGetPawnOwner();
-	if (!Pawn)
-		return;
+	const bool IsAcceleratingNow = !CurrentAcceleration.IsNearlyZero();
 
-	FRotator ActorRotation = Pawn->GetActorRotation();
-	float Delta = FMath::FindDeltaAngleDegrees(ActorRotation.Yaw, RotationLastTick.Yaw);
-	YawDelta = FMath::FInterpTo(YawDelta, Delta / DeltaTimeX, DeltaTimeX, 6);
-	InverseYawDelta = -YawDelta;
-
-	RotationLastTick = ActorRotation;
-}
-
-void UParagonAnimInstance::UpdateCardinalDirection(float DeltaTimeX)
-{
-	APawn* Pawn = TryGetPawnOwner();
-	if (!Pawn)
-		return;
-
-	ACharacter* Character = Cast<ACharacter>(Pawn);
-	if (!ensure(Character))
-		return;
-
-	UCharacterMovementComponent* CharacterMovement = Character->GetCharacterMovement();
-	if (!ensure(CharacterMovement))
-		return;
-
-	FVector CurrentAcceleration = CharacterMovement->GetCurrentAcceleration();
-	bool IsAcceleratingNow = FVector::DistSquared(CurrentAcceleration, FVector::ZeroVector) > 0;
-
-	if (!IsAcceleratingNow)
-		return;
-
-	CurrentAcceleration = FMath::VInterpTo(AccelerationLastTick, CurrentAcceleration, DeltaTimeX, 10);
-	AccelerationLastTick = CurrentAcceleration;
-
-	FRotator InputRotation = CurrentAcceleration.ToOrientationRotator();
-	FRotator ActorRotation = Pawn->GetActorRotation();
-
-	float Delta = FMath::FindDeltaAngleDegrees(InputRotation.Yaw, ActorRotation.Yaw);
-	if (Delta > 0.f)
+	if (IsAcceleratingNow != IsAccelerating)
 	{
-		if (Delta < 70.f)
+		if (IsAcceleratingNow)
 		{
-			CardinalDirection = ECardinalDirection::North;
-			CardinalDirectionAngle = Delta;
-		}
-		else if (Delta > 110.f)
-		{
-			CardinalDirection = ECardinalDirection::South;
-			CardinalDirectionAngle = Delta + 180;
+			DistanceMachingStartLocation = CurrentActorLoaction;
 		}
 		else
 		{
-			CardinalDirection = ECardinalDirection::West;
-			CardinalDirectionAngle = Delta - 90;
+			PredictStopLocation(
+				DistanceMachingStopLocation,
+				CurrentActorLoaction,
+				CurrentVelocity,
+				CurrentAcceleration,
+				CharacterMovement->BrakingFriction * CharacterMovement->BrakingFrictionFactor,
+				CharacterMovement->GetMaxBrakingDeceleration(),
+				CharacterMovement->MaxSimulationTimeStep,
+				100);
 		}
+
+#if ENABLE_DRAW_DEBUG
+		if (bDrawDebug)
+		{
+			if (IsAcceleratingNow)
+				DrawDebugSphere(GetWorld(), DistanceMachingStartLocation, 10, 8, FColor::Green, false, 3.f);
+			else
+				DrawDebugSphere(GetWorld(), DistanceMachingStopLocation, 10, 8, FColor::Red, false, 3.f);
+		}
+#endif // ENABLE_DRAW_DEBUG
 	}
-	else
+
+	DistanceMachingStart = FVector::Dist2D(CurrentActorLoaction, DistanceMachingStartLocation) * DistanceMachingScaling;
+	DistanceMachingStop = -FVector::Dist2D(CurrentActorLoaction, DistanceMachingStopLocation) * DistanceMachingScaling;
+
+	IsAccelerating = IsAcceleratingNow;
+	IsMoving = !CurrentVelocity.IsNearlyZero();
+
+	float YawDelta = FMath::FindDeltaAngleDegrees(ActorRotation.Yaw, NewActorRotation.Yaw);
+	Lean = FMath::FInterpTo(Lean, YawDelta / DeltaSeconds * LeanFactor, DeltaSeconds, LeanInterpSpeed);
+
+	ActorRotation = NewActorRotation;
+
+	if (IsAccelerating)
 	{
-		if (Delta > -70.f)
+		float CardinalDirectionAngle = 0.f;
+
+		const FRotator InputRotation = CurrentAcceleration.ToOrientationRotator();
+
+		const float InputDelta = FMath::FindDeltaAngleDegrees(InputRotation.Yaw, ActorRotation.Yaw);
+		if (InputDelta > 0.f)
 		{
-			CardinalDirection = ECardinalDirection::North;
-			CardinalDirectionAngle = Delta;
-		}
-		else if (Delta < -110.f)
-		{
-			CardinalDirection = ECardinalDirection::South;
-			CardinalDirectionAngle = Delta + 180;
+			if (InputDelta < 70.f)
+			{
+				CardinalDirection = EAnimCardinalDirection::North;
+				CardinalDirectionAngle = InputDelta;
+			}
+			else if (InputDelta > 110.f)
+			{
+				CardinalDirection = EAnimCardinalDirection::South;
+				CardinalDirectionAngle = InputDelta + 180;
+			}
+			else
+			{
+				CardinalDirection = EAnimCardinalDirection::West;
+				CardinalDirectionAngle = InputDelta - 90;
+			}
 		}
 		else
 		{
-			CardinalDirection = ECardinalDirection::East;
-			CardinalDirectionAngle = Delta + 90;
+			if (InputDelta > -70.f)
+			{
+				CardinalDirection = EAnimCardinalDirection::North;
+				CardinalDirectionAngle = InputDelta;
+			}
+			else if (InputDelta < -110.f)
+			{
+				CardinalDirection = EAnimCardinalDirection::South;
+				CardinalDirectionAngle = InputDelta + 180;
+			}
+			else
+			{
+				CardinalDirection = EAnimCardinalDirection::East;
+				CardinalDirectionAngle = InputDelta + 90;
+			}
 		}
+
+		CardinalDirectionAngle = -CardinalDirectionAngle;
+
+		const FRotator CardinalDirectionRotation(0.f, CardinalDirectionAngle, 0.f);
+		const FRotator TargetMeshRotation = BaseMeshRotationOffset + CardinalDirectionRotation + ActorRotation;
+		MeshRotation = FMath::RInterpTo(MeshRotation, TargetMeshRotation, DeltaSeconds, MeshRotationInterpSpeed);
+		// 记得关闭移动组件的NetworkSmoothing，否则MeshRotation的修改会被SmoothClientPosition覆盖
+		Mesh->SetWorldRotation(MeshRotation);
 	}
 
-	CardinalDirectionAngle = -CardinalDirectionAngle;
+	const FRotator BaseAimRotation = Character->GetBaseAimRotation();
+	FRotator AimDelta = BaseAimRotation - (MeshRotation - BaseMeshRotationOffset);
+	AimDelta.Normalize();
+	AimYaw = AimDelta.Yaw;
+	AimPitch = AimDelta.Pitch;
 }
 #pragma optimize( "", on )

@@ -93,7 +93,6 @@ namespace
 FAnimNode_DistanceMatching::FAnimNode_DistanceMatching()
 	: Sequence(nullptr)
 	, Distance(0.0f)
-	, EnableMatching(true)
 {
 }
 
@@ -104,7 +103,7 @@ float FAnimNode_DistanceMatching::GetCurrentAssetTime()
 
 float FAnimNode_DistanceMatching::GetCurrentAssetLength()
 {
-	return Sequence ? Sequence->SequenceLength : 0.0f;
+	return Sequence ? Sequence->GetPlayLength() : 0.0f;
 }
 
 void FAnimNode_DistanceMatching::Initialize_AnyThread(const FAnimationInitializeContext& Context)
@@ -121,7 +120,7 @@ void FAnimNode_DistanceMatching::UpdateAssetPlayer(const FAnimationUpdateContext
 {
 	GetEvaluateGraphExposedInputs().Execute(Context);
 
-	if (Sequence && EnableMatching)
+	if (Sequence)
 	{
 		float Time = InternalTimeAccumulator;
 		float MoveDelta = Context.GetDeltaTime();
@@ -132,7 +131,7 @@ void FAnimNode_DistanceMatching::UpdateAssetPlayer(const FAnimationUpdateContext
 		else
 			Time += MoveDelta;
 
-		Time = FMath::Min(Time, Sequence->SequenceLength);
+		Time = FMath::Min(Time, Sequence->GetPlayLength());
 
 		InternalTimeAccumulator = Time;
 	}
@@ -143,7 +142,8 @@ void FAnimNode_DistanceMatching::Evaluate_AnyThread(FPoseContext& Output)
 	check(Output.AnimInstanceProxy != nullptr);
 	if ((Sequence != nullptr) && (Output.AnimInstanceProxy->IsSkeletonCompatible(Sequence->GetSkeleton())))
 	{
-		Sequence->GetAnimationPose(Output.Pose, Output.Curve, FAnimExtractContext(InternalTimeAccumulator, Output.AnimInstanceProxy->ShouldExtractRootMotion()));
+		FAnimationPoseData AnimationPoseData(Output);
+		Sequence->GetAnimationPose(AnimationPoseData, FAnimExtractContext(InternalTimeAccumulator, Output.AnimInstanceProxy->ShouldExtractRootMotion()));
 	}
 	else
 	{
